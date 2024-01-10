@@ -1,6 +1,7 @@
 # Custom files
 LocalConfig.cmake
 src/colmap/util/version.cc
+*.prehip
 
 # Custom directories
 .idea/
