@@ -86,8 +86,8 @@ if(CUDA_ENABLED)
         PUBLIC_LINK_LIBS
             colmap_mvs
             colmap_util_cuda
-            CUDA::cudart
-            CUDA::curand
+            HIP::hiprt
+            HIP::rocrand
     )
 
     COLMAP_ADD_TEST(

@@ -3,16 +3,16 @@ add_definitions("-DSIFTGPU_NO_DEVIL")
 set(OPTIONAL_CUDA_SRCS)
 set(OPTIONAL_CUDA_LINK_LIBS)
 if(CUDA_ENABLED)
-    add_definitions("-DCUDA_SIFTGPU_ENABLED")
-    set(OPTIONAL_CUDA_SRCS
+  add_definitions("-DCUDA_SIFTGPU_ENABLED")
+  set(OPTIONAL_CUDA_SRCS
         CuTexImage.h CuTexImage.cpp
         ProgramCU.cu
         ProgramCU.h
         PyramidCU.h PyramidCU.cpp
         SiftMatchCU.h SiftMatchCU.cpp)
-    set(OPTIONAL_CUDA_LINK_LIBS
-        CUDA::cudart
-        CUDA::curand
+      set(OPTIONAL_CUDA_LINK_LIBS
+        HIP::hiprt
+        HIP::rocrand
     )
 endif()
 
