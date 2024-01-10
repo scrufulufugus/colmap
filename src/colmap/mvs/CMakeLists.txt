@@ -79,10 +79,10 @@ if(CUDA_ENABLED)
     COLMAP_ADD_LIBRARY(
         NAME colmap_mvs_cuda
         SRCS
-            gpu_mat_prng.h gpu_mat_prng.cu
-            gpu_mat_ref_image.h gpu_mat_ref_image.cu
+            gpu_mat_prng.h gpu_mat_prng.hip
+            gpu_mat_ref_image.h gpu_mat_ref_image.hip
             patch_match.h patch_match.cc
-            patch_match_cuda.h patch_match_cuda.cu
+            patch_match_cuda.h patch_match_cuda.hip
         PUBLIC_LINK_LIBS
             colmap_mvs
             colmap_util_cuda
@@ -92,7 +92,7 @@ if(CUDA_ENABLED)
 
     COLMAP_ADD_TEST(
         NAME gpu_mat_test
-        SRCS gpu_mat_test.cu
+        SRCS gpu_mat_test.hip
         LINK_LIBS colmap_mvs_cuda
     )
 endif()

@@ -6,7 +6,7 @@ if(CUDA_ENABLED)
   add_definitions("-DCUDA_SIFTGPU_ENABLED")
   set(OPTIONAL_CUDA_SRCS
         CuTexImage.h CuTexImage.cpp
-        ProgramCU.cu
+        ProgramCU.hip
         ProgramCU.h
         PyramidCU.h PyramidCU.cpp
         SiftMatchCU.h SiftMatchCU.cpp)
