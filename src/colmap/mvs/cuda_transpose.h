@@ -68,9 +68,9 @@ __global__ void CudaTransposeKernel(T* output_data,
 
   __shared__ T tile[TILE_DIM_TRANSPOSE][TILE_DIM_TRANSPOSE + 1];
   const int tile_x =
-      min(threadIdx.x, width - 1 - blockIdx.x * TILE_DIM_TRANSPOSE);
+      min((int)threadIdx.x, width - 1 - blockIdx.x * TILE_DIM_TRANSPOSE);
   const int tile_y =
-      min(threadIdx.y, height - 1 - blockIdx.y * TILE_DIM_TRANSPOSE);
+      min((int)threadIdx.y, height - 1 - blockIdx.y * TILE_DIM_TRANSPOSE);
 
   for (int i = 0; i < TILE_DIM_TRANSPOSE; i += BLOCK_ROWS_TRANSPOSE) {
     const int x = min(x_index, width - 1);
