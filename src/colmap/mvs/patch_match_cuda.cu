@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 // Copyright (c) 2023, ETH Zurich and UNC Chapel Hill.
 // All rights reserved.
 //
@@ -80,13 +81,13 @@ __device__ inline float DotProduct3(const float vec1[3], const float vec2[3]) {
 
 __device__ inline float GenerateRandomDepth(const float depth_min,
                                             const float depth_max,
-                                            curandState* rand_state) {
-  return curand_uniform(rand_state) * (depth_max - depth_min) + depth_min;
+                                            hiprandState* rand_state) {
+  return hiprand_uniform(rand_state) * (depth_max - depth_min) + depth_min;
 }
 
 __device__ inline void GenerateRandomNormal(const int row,
                                             const int col,
-                                            curandState* rand_state,
+                                            hiprandState* rand_state,
                                             float normal[3]) {
   // Unbiased sampling of normal, according to George Marsaglia, "Choosing a
   // Point from the Surface of a Sphere", 1972.
@@ -94,8 +95,8 @@ __device__ inline void GenerateRandomNormal(const int row,
   float v2 = 0.0f;
   float s = 2.0f;
   while (s >= 1.0f) {
-    v1 = 2.0f * curand_uniform(rand_state) - 1.0f;
-    v2 = 2.0f * curand_uniform(rand_state) - 1.0f;
+    v1 = 2.0f * hiprand_uniform(rand_state) - 1.0f;
+    v2 = 2.0f * hiprand_uniform(rand_state) - 1.0f;
     s = v1 * v1 + v2 * v2;
   }
 
@@ -117,7 +118,7 @@ __device__ inline void GenerateRandomNormal(const int row,
 
 __device__ inline float PerturbDepth(const float perturbation,
                                      const float depth,
-                                     curandState* rand_state) {
+                                     hiprandState* rand_state) {
   const float depth_min = (1.0f - perturbation) * depth;
   const float depth_max = (1.0f + perturbation) * depth;
   return GenerateRandomDepth(depth_min, depth_max, rand_state);
@@ -127,13 +128,13 @@ __device__ inline void PerturbNormal(const int row,
                                      const int col,
                                      const float perturbation,
                                      const float normal[3],
-                                     curandState* rand_state,
+                                     hiprandState* rand_state,
                                      float perturbed_normal[3],
                                      const int num_trials = 0) {
   // Perturbation rotation angles.
-  const float a1 = (curand_uniform(rand_state) - 0.5f) * perturbation;
-  const float a2 = (curand_uniform(rand_state) - 0.5f) * perturbation;
-  const float a3 = (curand_uniform(rand_state) - 0.5f) * perturbation;
+  const float a1 = (hiprand_uniform(rand_state) - 0.5f) * perturbation;
+  const float a2 = (hiprand_uniform(rand_state) - 0.5f) * perturbation;
+  const float a3 = (hiprand_uniform(rand_state) - 0.5f) * perturbation;
 
   const float sin_a1 = sin(a1);
   const float sin_a2 = sin(a2);
@@ -232,7 +233,7 @@ __device__ inline float PropagateDepth(const float depth1,
 // point. Second, compute incident angle between viewing direction of source
 // image and normal direction of 3D point. Both angles are cosine distances.
 __device__ inline void ComputeViewingAngles(
-    const cudaTextureObject_t poses_texture,
+    const hipTextureObject_t poses_texture,
     const float point[3],
     const float normal[3],
     const int image_idx,
@@ -261,7 +262,7 @@ __device__ inline void ComputeViewingAngles(
 }
 
 __device__ inline void ComposeHomography(
-    const cudaTextureObject_t poses_texture,
+    const hipTextureObject_t poses_texture,
     const int image_idx,
     const int row,
     const int col,
@@ -341,7 +342,7 @@ struct LocalRefImage {
   const static int kNumColumns = kThreadBlockSize * THREADS_PER_BLOCK;
   const static int kDataSize = kNumRows * kNumColumns;
 
-  __device__ explicit LocalRefImage(const cudaTextureObject_t ref_image_texture)
+  __device__ explicit LocalRefImage(const hipTextureObject_t ref_image_texture)
       : ref_image_texture_(ref_image_texture) {}
 
   float* data = nullptr;
@@ -402,7 +403,7 @@ struct LocalRefImage {
   }
 
  private:
-  const cudaTextureObject_t ref_image_texture_;
+  const hipTextureObject_t ref_image_texture_;
 };
 
 // The return values is 1 - NCC, so the range is [0, 2], the smaller the
@@ -412,9 +413,9 @@ struct PhotoConsistencyCostComputer {
   const static int kWindowRadius = kWindowSize / 2;
 
   __device__ PhotoConsistencyCostComputer(
-      const cudaTextureObject_t ref_image_texture,
-      const cudaTextureObject_t src_images_texture,
-      const cudaTextureObject_t poses_texture,
+      const hipTextureObject_t ref_image_texture,
+      const hipTextureObject_t src_images_texture,
+      const hipTextureObject_t poses_texture,
       const float sigma_spatial,
       const float sigma_color)
       : local_ref_image(ref_image_texture),
@@ -551,14 +552,14 @@ struct PhotoConsistencyCostComputer {
   }
 
  private:
-  const cudaTextureObject_t src_images_texture_;
-  const cudaTextureObject_t poses_texture_;
+  const hipTextureObject_t src_images_texture_;
+  const hipTextureObject_t poses_texture_;
   const BilateralWeightComputer bilateral_weight_computer_;
 };
 
 __device__ inline float ComputeGeomConsistencyCost(
-    const cudaTextureObject_t poses_texture,
-    const cudaTextureObject_t src_depth_maps_texture,
+    const hipTextureObject_t poses_texture,
+    const hipTextureObject_t src_depth_maps_texture,
     const float row,
     const float col,
     const float depth,
@@ -792,11 +793,11 @@ class LikelihoodComputer {
 
 // Rotate normals by 90deg around z-axis in counter-clockwise direction.
 __global__ void InitNormalMap(GpuMat<float> normal_map,
-                              GpuMat<curandState> rand_state_map) {
+                              GpuMat<hiprandState> rand_state_map) {
   const int row = blockDim.y * blockIdx.y + threadIdx.y;
   const int col = blockDim.x * blockIdx.x + threadIdx.x;
   if (col < normal_map.GetWidth() && row < normal_map.GetHeight()) {
-    curandState rand_state = rand_state_map.Get(row, col);
+    hiprandState rand_state = rand_state_map.Get(row, col);
     float normal[3];
     GenerateRandomNormal(row, col, &rand_state, normal);
     normal_map.SetSlice(row, col, normal);
@@ -823,11 +824,11 @@ template <int kWindowSize, int kWindowStep>
 __global__ void ComputeInitialCost(GpuMat<float> cost_map,
                                    const GpuMat<float> depth_map,
                                    const GpuMat<float> normal_map,
-                                   const cudaTextureObject_t ref_image_texture,
+                                   const hipTextureObject_t ref_image_texture,
                                    const GpuMat<float> ref_sum_image,
                                    const GpuMat<float> ref_squared_sum_image,
-                                   const cudaTextureObject_t src_images_texture,
-                                   const cudaTextureObject_t poses_texture,
+                                   const hipTextureObject_t src_images_texture,
+                                   const hipTextureObject_t poses_texture,
                                    const float sigma_spatial,
                                    const float sigma_color) {
   const int col = blockDim.x * blockIdx.x + threadIdx.x;
@@ -895,19 +896,19 @@ template <int kWindowSize,
           bool kFilterGeomConsistency = false>
 __global__ void SweepFromTopToBottom(
     GpuMat<float> global_workspace,
-    GpuMat<curandState> rand_state_map,
+    GpuMat<hiprandState> rand_state_map,
     GpuMat<float> cost_map,
     GpuMat<float> depth_map,
     GpuMat<float> normal_map,
     GpuMat<uint8_t> consistency_mask,
     GpuMat<float> sel_prob_map,
     const GpuMat<float> prev_sel_prob_map,
-    const cudaTextureObject_t ref_image_texture,
+    const hipTextureObject_t ref_image_texture,
     const GpuMat<float> ref_sum_image,
     const GpuMat<float> ref_squared_sum_image,
-    const cudaTextureObject_t src_images_texture,
-    const cudaTextureObject_t src_depth_maps_texture,
-    const cudaTextureObject_t poses_texture,
+    const hipTextureObject_t src_images_texture,
+    const hipTextureObject_t src_depth_maps_texture,
+    const hipTextureObject_t poses_texture,
     const SweepOptions options) {
   const int col = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -975,7 +976,7 @@ __global__ void SweepFromTopToBottom(
   // Randomly sampled parameters.
   ParamState rand_param_state;
   // Cuda PRNG state for random sampling.
-  curandState rand_state;
+  hiprandState rand_state;
 
   if (col < cost_map.GetWidth()) {
     // Read random state for current column.
@@ -1084,7 +1085,7 @@ __global__ void SweepFromTopToBottom(
                                        curr_param_state.normal};
 
     for (int sample = 0; sample < options.num_samples; ++sample) {
-      const float rand_prob = curand_uniform(&rand_state) - FLT_EPSILON;
+      const float rand_prob = hiprand_uniform(&rand_state) - FLT_EPSILON;
 
       pcc_computer.src_image_idx = -1;
       for (int image_idx = 0; image_idx < cost_map.GetDepth(); ++image_idx) {
@@ -1519,13 +1520,13 @@ void PatchMatchCuda::ComputeCudaConfig() {
 }
 
 void PatchMatchCuda::BindRefImageTexture() {
-  cudaTextureDesc texture_desc;
+  hipTextureDesc texture_desc;
   memset(&texture_desc, 0, sizeof(texture_desc));
-  texture_desc.addressMode[0] = cudaAddressModeBorder;
-  texture_desc.addressMode[1] = cudaAddressModeBorder;
-  texture_desc.addressMode[2] = cudaAddressModeBorder;
-  texture_desc.filterMode = cudaFilterModePoint;
-  texture_desc.readMode = cudaReadModeNormalizedFloat;
+  texture_desc.addressMode[0] = hipAddressModeBorder;
+  texture_desc.addressMode[1] = hipAddressModeBorder;
+  texture_desc.addressMode[2] = hipAddressModeBorder;
+  texture_desc.filterMode = hipFilterModePoint;
+  texture_desc.readMode = hipReadModeNormalizedFloat;
   texture_desc.normalizedCoords = false;
   ref_image_texture_ = CudaArrayLayeredTexture<uint8_t>::FromGpuMat(
       texture_desc, *ref_image_->image);
@@ -1583,13 +1584,13 @@ void PatchMatchCuda::InitSourceImages() {
     }
 
     // Create source images texture.
-    cudaTextureDesc texture_desc;
+    hipTextureDesc texture_desc;
     memset(&texture_desc, 0, sizeof(texture_desc));
-    texture_desc.addressMode[0] = cudaAddressModeBorder;
-    texture_desc.addressMode[1] = cudaAddressModeBorder;
-    texture_desc.addressMode[2] = cudaAddressModeBorder;
-    texture_desc.filterMode = cudaFilterModeLinear;
-    texture_desc.readMode = cudaReadModeNormalizedFloat;
+    texture_desc.addressMode[0] = hipAddressModeBorder;
+    texture_desc.addressMode[1] = hipAddressModeBorder;
+    texture_desc.addressMode[2] = hipAddressModeBorder;
+    texture_desc.filterMode = hipFilterModeLinear;
+    texture_desc.readMode = hipReadModeNormalizedFloat;
     texture_desc.normalizedCoords = false;
     src_images_texture_ = CudaArrayLayeredTexture<uint8_t>::FromHostArray(
         texture_desc,
@@ -1620,13 +1621,13 @@ void PatchMatchCuda::InitSourceImages() {
     }
 
     // Create source depth maps texture.
-    cudaTextureDesc texture_desc;
+    hipTextureDesc texture_desc;
     memset(&texture_desc, 0, sizeof(texture_desc));
-    texture_desc.addressMode[0] = cudaAddressModeBorder;
-    texture_desc.addressMode[1] = cudaAddressModeBorder;
-    texture_desc.addressMode[2] = cudaAddressModeBorder;
-    texture_desc.filterMode = cudaFilterModePoint;
-    texture_desc.readMode = cudaReadModeElementType;
+    texture_desc.addressMode[0] = hipAddressModeBorder;
+    texture_desc.addressMode[1] = hipAddressModeBorder;
+    texture_desc.addressMode[2] = hipAddressModeBorder;
+    texture_desc.filterMode = hipFilterModePoint;
+    texture_desc.readMode = hipReadModeElementType;
     texture_desc.normalizedCoords = false;
     src_depth_maps_texture_ = CudaArrayLayeredTexture<float>::FromHostArray(
         texture_desc,
@@ -1674,13 +1675,13 @@ void PatchMatchCuda::InitTransforms() {
   }
 
   // Bind 0 degrees version to constant global memory.
-  CUDA_SAFE_CALL(cudaMemcpyToSymbol(
-      ref_K, ref_K_host_[0], sizeof(float) * 4, 0, cudaMemcpyHostToDevice));
-  CUDA_SAFE_CALL(cudaMemcpyToSymbol(ref_inv_K,
+  CUDA_SAFE_CALL(hipMemcpyToSymbol(HIP_SYMBOL(
+      ref_K), ref_K_host_[0], sizeof(float) * 4, 0, hipMemcpyHostToDevice));
+  CUDA_SAFE_CALL(hipMemcpyToSymbol(HIP_SYMBOL(ref_inv_K),
                                     ref_inv_K_host_[0],
                                     sizeof(float) * 4,
                                     0,
-                                    cudaMemcpyHostToDevice));
+                                    hipMemcpyHostToDevice));
 
   //////////////////////////////////////////////////////////////////////////////
   // Generate rotated versions of camera poses.
@@ -1695,13 +1696,13 @@ void PatchMatchCuda::InitTransforms() {
   // Matrix for 90deg rotation around Z-axis in counter-clockwise direction.
   const float R_z90[9] = {0, 1, 0, -1, 0, 0, 0, 0, 1};
 
-  cudaTextureDesc texture_desc;
+  hipTextureDesc texture_desc;
   memset(&texture_desc, 0, sizeof(texture_desc));
-  texture_desc.addressMode[0] = cudaAddressModeBorder;
-  texture_desc.addressMode[1] = cudaAddressModeBorder;
-  texture_desc.addressMode[2] = cudaAddressModeBorder;
-  texture_desc.filterMode = cudaFilterModePoint;
-  texture_desc.readMode = cudaReadModeElementType;
+  texture_desc.addressMode[0] = hipAddressModeBorder;
+  texture_desc.addressMode[1] = hipAddressModeBorder;
+  texture_desc.addressMode[2] = hipAddressModeBorder;
+  texture_desc.filterMode = hipFilterModePoint;
+  texture_desc.readMode = hipReadModeElementType;
   texture_desc.normalizedCoords = false;
 
   for (size_t i = 0; i < 4; ++i) {
@@ -1869,16 +1870,16 @@ void PatchMatchCuda::Rotate() {
   }
 
   // Rotate calibration.
-  CUDA_SAFE_CALL(cudaMemcpyToSymbol(ref_K,
+  CUDA_SAFE_CALL(hipMemcpyToSymbol(HIP_SYMBOL(ref_K),
                                     ref_K_host_[rotation_in_half_pi_],
                                     sizeof(float) * 4,
                                     0,
-                                    cudaMemcpyHostToDevice));
-  CUDA_SAFE_CALL(cudaMemcpyToSymbol(ref_inv_K,
+                                    hipMemcpyHostToDevice));
+  CUDA_SAFE_CALL(hipMemcpyToSymbol(HIP_SYMBOL(ref_inv_K),
                                     ref_inv_K_host_[rotation_in_half_pi_],
                                     sizeof(float) * 4,
                                     0,
-                                    cudaMemcpyHostToDevice));
+                                    hipMemcpyHostToDevice));
 
   // Recompute Cuda configuration for rotated reference image.
   ComputeCudaConfig();

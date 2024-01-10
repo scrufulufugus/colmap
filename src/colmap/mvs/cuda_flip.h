@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 // Copyright (c) 2023, ETH Zurich and UNC Chapel Hill.
 // All rights reserved.
 //
@@ -29,7 +30,7 @@
 
 #pragma once
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace colmap {
 namespace mvs {
@@ -47,7 +48,7 @@ void CudaFlipHorizontal(const T* input,
 // Implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef __CUDACC__
+#ifdef __HIPCC__
 
 // TILE_DIM_FLIP must divide by BLOCK_ROWS. Do not change these values.
 #define TILE_DIM_FLIP 32
@@ -110,7 +111,7 @@ void CudaFlipHorizontal(const T* input,
 #undef TILE_DIM_FLIP
 #undef BLOCK_ROWS_FLIP
 
-#endif  // __CUDACC__
+#endif  // __HIPCC__
 
 }  // namespace mvs
 }  // namespace colmap

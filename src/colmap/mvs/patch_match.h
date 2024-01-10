@@ -33,7 +33,7 @@
 #include "colmap/mvs/image.h"
 #include "colmap/mvs/model.h"
 #include "colmap/mvs/normal_map.h"
-#ifndef __CUDACC__
+#ifndef __HIPCC__
 #include "colmap/util/threading.h"
 #endif
 
@@ -243,7 +243,7 @@ class PatchMatch {
 // images. Note that all specified images must be reconstructed in the COLMAP
 // reconstruction provided in the `sparse` folder.
 
-#ifndef __CUDACC__
+#ifndef __HIPCC__
 
 class PatchMatchController : public Thread {
  public:

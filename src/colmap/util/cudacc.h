@@ -31,7 +31,7 @@
 
 #include <string>
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 #define CUDA_SAFE_CALL(error) CudaSafeCall(error, __FILE__, __LINE__)
 #define CUDA_CHECK() CudaCheck(__FILE__, __LINE__)
@@ -47,12 +47,12 @@ class CudaTimer {
   void Print(const std::string& message);
 
  private:
-  cudaEvent_t start_;
-  cudaEvent_t stop_;
+  hipEvent_t start_;
+  hipEvent_t stop_;
   float elapsed_time_;
 };
 
-void CudaSafeCall(const cudaError_t error,
+void CudaSafeCall(const hipError_t error,
                   const std::string& file,
                   const int line);
 

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 // Copyright (c) 2023, ETH Zurich and UNC Chapel Hill.
 // All rights reserved.
 //
@@ -36,7 +37,7 @@ namespace colmap {
 namespace mvs {
 namespace {
 
-__global__ void FilterKernel(const cudaTextureObject_t image_texture,
+__global__ void FilterKernel(const hipTextureObject_t image_texture,
                              GpuMat<uint8_t> image,
                              GpuMat<float> sum_image,
                              GpuMat<float> squared_sum_image,
@@ -94,13 +95,13 @@ void GpuMatRefImage::Filter(const uint8_t* image_data,
                             const size_t window_step,
                             const float sigma_spatial,
                             const float sigma_color) {
-  cudaTextureDesc texture_desc;
+  hipTextureDesc texture_desc;
   memset(&texture_desc, 0, sizeof(texture_desc));
-  texture_desc.addressMode[0] = cudaAddressModeBorder;
-  texture_desc.addressMode[1] = cudaAddressModeBorder;
-  texture_desc.addressMode[2] = cudaAddressModeBorder;
-  texture_desc.filterMode = cudaFilterModePoint;
-  texture_desc.readMode = cudaReadModeNormalizedFloat;
+  texture_desc.addressMode[0] = hipAddressModeBorder;
+  texture_desc.addressMode[1] = hipAddressModeBorder;
+  texture_desc.addressMode[2] = hipAddressModeBorder;
+  texture_desc.filterMode = hipFilterModePoint;
+  texture_desc.readMode = hipReadModeNormalizedFloat;
   texture_desc.normalizedCoords = false;
   auto image_texture = CudaArrayLayeredTexture<uint8_t>::FromHostArray(
       texture_desc, width_, height_, 1, image_data);

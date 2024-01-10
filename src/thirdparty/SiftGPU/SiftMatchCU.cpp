@@ -31,7 +31,7 @@
 #include <vector>
 using namespace std;
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 #include "CuTexImage.h"
 #include "GlobalUtil.h"
@@ -190,8 +190,8 @@ int SiftMatchCU::GetBestMatch(int max_match, uint32_t match_buffer[][2],
     }
   }
 
-  cudaError_t error = cudaGetLastError();
-  if (error != cudaSuccess) {
+  hipError_t error = hipGetLastError();
+  if (error != hipSuccess) {
     return -1;
   }
 

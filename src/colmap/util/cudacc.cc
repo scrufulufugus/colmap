@@ -34,51 +34,51 @@
 namespace colmap {
 
 CudaTimer::CudaTimer() {
-  CUDA_SAFE_CALL(cudaEventCreate(&start_));
-  CUDA_SAFE_CALL(cudaEventCreate(&stop_));
-  CUDA_SAFE_CALL(cudaEventRecord(start_, 0));
+  CUDA_SAFE_CALL(hipEventCreate(&start_));
+  CUDA_SAFE_CALL(hipEventCreate(&stop_));
+  CUDA_SAFE_CALL(hipEventRecord(start_, 0));
 }
 
 CudaTimer::~CudaTimer() {
-  CUDA_SAFE_CALL(cudaEventDestroy(start_));
-  CUDA_SAFE_CALL(cudaEventDestroy(stop_));
+  CUDA_SAFE_CALL(hipEventDestroy(start_));
+  CUDA_SAFE_CALL(hipEventDestroy(stop_));
 }
 
 void CudaTimer::Print(const std::string& message) {
-  CUDA_SAFE_CALL(cudaEventRecord(stop_, 0));
-  CUDA_SAFE_CALL(cudaEventSynchronize(stop_));
-  CUDA_SAFE_CALL(cudaEventElapsedTime(&elapsed_time_, start_, stop_));
+  CUDA_SAFE_CALL(hipEventRecord(stop_, 0));
+  CUDA_SAFE_CALL(hipEventSynchronize(stop_));
+  CUDA_SAFE_CALL(hipEventElapsedTime(&elapsed_time_, start_, stop_));
   LOG(INFO) << StringPrintf(
       "%s: %.4fs", message.c_str(), elapsed_time_ / 1000.0f);
 }
 
-void CudaSafeCall(const cudaError_t error,
+void CudaSafeCall(const hipError_t error,
                   const std::string& file,
                   const int line) {
-  if (error != cudaSuccess) {
+  if (error != hipSuccess) {
     LOG(ERROR) << StringPrintf("CUDA error at %s:%i - %s",
                                file.c_str(),
                                line,
-                               cudaGetErrorString(error));
+                               hipGetErrorString(error));
     exit(EXIT_FAILURE);
   }
 }
 
 void CudaCheck(const char* file, const int line) {
-  const cudaError error = cudaGetLastError();
-  while (error != cudaSuccess) {
+  const hipError_t error = hipGetLastError();
+  while (error != hipSuccess) {
     LOG(ERROR) << StringPrintf(
-        "CUDA error at %s:%i - %s", file, line, cudaGetErrorString(error));
+        "CUDA error at %s:%i - %s", file, line, hipGetErrorString(error));
     exit(EXIT_FAILURE);
   }
 }
 
 void CudaSyncAndCheck(const char* file, const int line) {
   // Synchronizes the default stream which is a nullptr.
-  const cudaError error = cudaStreamSynchronize(nullptr);
-  if (cudaSuccess != error) {
+  const hipError_t error = hipStreamSynchronize(nullptr);
+  if (hipSuccess != error) {
     LOG(ERROR) << StringPrintf(
-        "CUDA error at %s:%i - %s", file, line, cudaGetErrorString(error));
+        "CUDA error at %s:%i - %s", file, line, hipGetErrorString(error));
     LOG(ERROR)
         << "This error is likely caused by the graphics card timeout "
            "detection mechanism of your operating system. Please refer to "

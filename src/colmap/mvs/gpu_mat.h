@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 // Copyright (c) 2023, ETH Zurich and UNC Chapel Hill.
 // All rights reserved.
 //
@@ -42,8 +43,8 @@
 #include <memory>
 #include <string>
 
-#include <cuda_runtime.h>
-#include <curand_kernel.h>
+#include <hip/hip_runtime.h>
+#include <hiprand_kernel.h>
 
 namespace colmap {
 namespace mvs {
@@ -81,7 +82,7 @@ class GpuMat {
   void FillWithVector(const T* values);
   void FillWithRandomNumbers(const T min_value,
                              const T max_value,
-                             GpuMat<curandState> random_state);
+                             GpuMat<hiprandState> random_state);
 
   void CopyToDevice(const T* data, const size_t pitch);
   void CopyToHost(T* data, const size_t pitch) const;
@@ -122,7 +123,7 @@ class GpuMat {
 // Implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef __CUDACC__
+#ifdef __HIPCC__
 
 namespace internal {
 
@@ -150,16 +151,16 @@ __global__ void FillWithVectorKernel(const T* values, GpuMat<T> output) {
 
 template <typename T>
 __global__ void FillWithRandomNumbersKernel(GpuMat<T> output,
-                                            GpuMat<curandState> random_state,
+                                            GpuMat<hiprandState> random_state,
                                             const T min_value,
                                             const T max_value) {
   const size_t row = blockIdx.y * blockDim.y + threadIdx.y;
   const size_t col = blockIdx.x * blockDim.x + threadIdx.x;
   if (row < output.GetHeight() && col < output.GetWidth()) {
-    curandState local_state = random_state.Get(row, col);
+    hiprandState local_state = random_state.Get(row, col);
     for (size_t slice = 0; slice < output.GetDepth(); ++slice) {
       const T random_value =
-          curand_uniform(&local_state) * (max_value - min_value) + min_value;
+          hiprand_uniform(&local_state) * (max_value - min_value) + min_value;
       output.Set(row, col, slice, random_value);
     }
     random_state.Set(row, col, local_state);
@@ -175,10 +176,10 @@ GpuMat<T>::GpuMat(const size_t width, const size_t height, const size_t depth)
       width_(width),
       height_(height),
       depth_(depth) {
-  CUDA_SAFE_CALL(cudaMallocPitch(
+  CUDA_SAFE_CALL(hipMallocPitch(
       (void**)&array_ptr_, &pitch_, width_ * sizeof(T), height_ * depth_));
 
-  array_ = std::shared_ptr<T>(array_ptr_, cudaFree);
+  array_ = std::shared_ptr<T>(array_ptr_, hipFree);
 
   ComputeCudaConfig();
 }
@@ -284,19 +285,19 @@ void GpuMat<T>::FillWithScalar(const T value) {
 template <typename T>
 void GpuMat<T>::FillWithVector(const T* values) {
   T* values_device;
-  CUDA_SAFE_CALL(cudaMalloc((void**)&values_device, depth_ * sizeof(T)));
-  CUDA_SAFE_CALL(cudaMemcpy(
-      values_device, values, depth_ * sizeof(T), cudaMemcpyHostToDevice));
+  CUDA_SAFE_CALL(hipMalloc((void**)&values_device, depth_ * sizeof(T)));
+  CUDA_SAFE_CALL(hipMemcpy(
+      values_device, values, depth_ * sizeof(T), hipMemcpyHostToDevice));
   internal::FillWithVectorKernel<T>
       <<<gridSize_, blockSize_>>>(values_device, *this);
   CUDA_SYNC_AND_CHECK();
-  CUDA_SAFE_CALL(cudaFree(values_device));
+  CUDA_SAFE_CALL(hipFree(values_device));
 }
 
 template <typename T>
 void GpuMat<T>::FillWithRandomNumbers(const T min_value,
                                       const T max_value,
-                                      const GpuMat<curandState> random_state) {
+                                      const GpuMat<hiprandState> random_state) {
   internal::FillWithRandomNumbersKernel<T>
       <<<gridSize_, blockSize_>>>(*this, random_state, min_value, max_value);
   CUDA_SYNC_AND_CHECK();
@@ -304,24 +305,24 @@ void GpuMat<T>::FillWithRandomNumbers(const T min_value,
 
 template <typename T>
 void GpuMat<T>::CopyToDevice(const T* data, const size_t pitch) {
-  CUDA_SAFE_CALL(cudaMemcpy2D((void*)array_ptr_,
+  CUDA_SAFE_CALL(hipMemcpy2D((void*)array_ptr_,
                               (size_t)pitch_,
                               (void*)data,
                               pitch,
                               width_ * sizeof(T),
                               height_ * depth_,
-                              cudaMemcpyHostToDevice));
+                              hipMemcpyHostToDevice));
 }
 
 template <typename T>
 void GpuMat<T>::CopyToHost(T* data, const size_t pitch) const {
-  CUDA_SAFE_CALL(cudaMemcpy2D((void*)data,
+  CUDA_SAFE_CALL(hipMemcpy2D((void*)data,
                               pitch,
                               (void*)array_ptr_,
                               (size_t)pitch_,
                               width_ * sizeof(T),
                               height_ * depth_,
-                              cudaMemcpyDeviceToHost));
+                              hipMemcpyDeviceToHost));
 }
 
 template <typename T>
@@ -420,13 +421,13 @@ template <typename T>
 void GpuMat<T>::Write(const std::string& path, const size_t slice) {
   std::vector<T> dest(width_ * height_);
   CUDA_SAFE_CALL(
-      cudaMemcpy2D((void*)dest.data(),
+      hipMemcpy2D((void*)dest.data(),
                    width_ * sizeof(T),
                    (void*)(array_ptr_ + slice * height_ * pitch_ / sizeof(T)),
                    pitch_,
                    width_ * sizeof(T),
                    height_,
-                   cudaMemcpyDeviceToHost));
+                   hipMemcpyDeviceToHost));
 
   std::fstream text_file(path, std::ios::out);
   text_file << width_ << "&" << height_ << "&" << 1 << "&";
@@ -449,7 +450,7 @@ void GpuMat<T>::ComputeCudaConfig() {
   gridSize_.z = 1;
 }
 
-#endif  // __CUDACC__
+#endif  // __HIPCC__
 
 }  // namespace mvs
 }  // namespace colmap

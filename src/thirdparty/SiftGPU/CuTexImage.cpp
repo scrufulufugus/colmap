@@ -31,9 +31,9 @@
 using namespace std;
 
 
-#include <cuda.h>
-#include <cuda_runtime_api.h>
-#include <cuda_gl_interop.h>
+#include <hip/hip_runtime.h>
+#include <hip/hip_runtime_api.h>
+#include <hip/hip_gl_interop.h>
 
 #include "GlobalUtil.h"
 #include "GLTexImage.h"
@@ -42,42 +42,42 @@ using namespace std;
 
 CuTexImage::CuTexObj::~CuTexObj()
 {
-	cudaDestroyTextureObject(handle);
+	hipDestroyTextureObject(handle);
 }
 
-CuTexImage::CuTexObj CuTexImage::BindTexture(const cudaTextureDesc& textureDesc,
-											   										 const cudaChannelFormatDesc& channelFmtDesc)
+CuTexImage::CuTexObj CuTexImage::BindTexture(const hipTextureDesc& textureDesc,
+											   										 const hipChannelFormatDesc& channelFmtDesc)
 {
 	CuTexObj texObj;
 
-	cudaResourceDesc resourceDesc;
+	hipResourceDesc resourceDesc;
 	memset(&resourceDesc, 0, sizeof(resourceDesc));
-  resourceDesc.resType = cudaResourceTypeLinear;
+  resourceDesc.resType = hipResourceTypeLinear;
   resourceDesc.res.linear.devPtr = _cuData;
 	resourceDesc.res.linear.desc = channelFmtDesc;
 	resourceDesc.res.linear.sizeInBytes = _numBytes;
 
-	cudaCreateTextureObject(&texObj.handle, &resourceDesc, &textureDesc, nullptr);
+	hipCreateTextureObject(&texObj.handle, &resourceDesc, &textureDesc, nullptr);
 	ProgramCU::CheckErrorCUDA("CuTexImage::BindTexture");
 
 	return texObj;
 }
 
-CuTexImage::CuTexObj CuTexImage::BindTexture2D(const cudaTextureDesc& textureDesc,
-											   											 const cudaChannelFormatDesc& channelFmtDesc)
+CuTexImage::CuTexObj CuTexImage::BindTexture2D(const hipTextureDesc& textureDesc,
+											   											 const hipChannelFormatDesc& channelFmtDesc)
 {
 	CuTexObj texObj;
 
-	cudaResourceDesc resourceDesc;
+	hipResourceDesc resourceDesc;
 	memset(&resourceDesc, 0, sizeof(resourceDesc));
-	resourceDesc.resType = cudaResourceTypePitch2D;
+	resourceDesc.resType = hipResourceTypePitch2D;
   resourceDesc.res.pitch2D.devPtr = _cuData;
 	resourceDesc.res.pitch2D.width = _imgWidth;
 	resourceDesc.res.pitch2D.height = _imgHeight;
 	resourceDesc.res.pitch2D.pitchInBytes = _imgWidth * _numChannel * sizeof(float);
 	resourceDesc.res.pitch2D.desc = channelFmtDesc;
 
-	cudaCreateTextureObject(&texObj.handle, &resourceDesc, &textureDesc, nullptr);
+	hipCreateTextureObject(&texObj.handle, &resourceDesc, &textureDesc, nullptr);
 	ProgramCU::CheckErrorCUDA("CuTexImage::BindTexture2D");
 
 	return texObj;
@@ -109,9 +109,8 @@ CuTexImage::CuTexImage(int width, int height, int nchannel, GLuint pbo)
 	if(bsize >=esize)
 	{
 
-		cudaGLRegisterBufferObject(pbo);
-		cudaGLMapBufferObject(&_cuData, pbo);
-		ProgramCU::CheckErrorCUDA("cudaGLMapBufferObject");
+    hipGraphicsGLRegisterBuffer(&_cuData, pbo, hipGraphicsRegisterFlagsNone);
+		ProgramCU::CheckErrorCUDA("hipGraphicsGLRegisterBuffer");
 		_fromPBO = pbo;
 	}else
 	{
@@ -143,13 +142,13 @@ CuTexImage::~CuTexImage()
 
 	if(_fromPBO)
 	{
-		cudaGLUnmapBufferObject(_fromPBO);
-		cudaGLUnregisterBufferObject(_fromPBO);
+		//cudaGLUnmapBufferObject(_fromPBO);
+		//cudaGLUnregisterBufferObject(_fromPBO);
 	}else if(_cuData)
 	{
-		cudaFree(_cuData);
+		hipFree(_cuData);
 	}
-	if(_cuData2D)  cudaFreeArray(_cuData2D);
+	if(_cuData2D)  hipFreeArray(_cuData2D);
 }
 
 void CuTexImage::SetImageSize(int width, int height)
@@ -178,12 +177,12 @@ bool CuTexImage::InitTexture(int width, int height, int nchannel)
 
 	if(size <= _numBytes) return true;
 
-	if(_cuData) cudaFree(_cuData);
+	if(_cuData) hipFree(_cuData);
 
 	//allocate the array data
-	const cudaError_t status = cudaMalloc(&_cuData, _numBytes = size);
+	const hipError_t status = hipMalloc(&_cuData, _numBytes = size);
 
-  if (status != cudaSuccess) {
+  if (status != hipSuccess) {
     _cuData = NULL;
     _numBytes = 0;
     return false;
@@ -195,37 +194,33 @@ bool CuTexImage::InitTexture(int width, int height, int nchannel)
 void CuTexImage::CopyFromHost(const void * buf)
 {
 	if(_cuData == NULL) return;
-	cudaMemcpy( _cuData, buf, _imgWidth * _imgHeight * _numChannel * sizeof(float), cudaMemcpyHostToDevice);
+	hipMemcpy( _cuData, buf, _imgWidth * _imgHeight * _numChannel * sizeof(float), hipMemcpyHostToDevice);
 }
 
 void CuTexImage::CopyToHost(void * buf)
 {
 	if(_cuData == NULL) return;
-	cudaMemcpy(buf, _cuData, _imgWidth * _imgHeight * _numChannel * sizeof(float), cudaMemcpyDeviceToHost);
+	hipMemcpy(buf, _cuData, _imgWidth * _imgHeight * _numChannel * sizeof(float), hipMemcpyDeviceToHost);
 }
 
 void CuTexImage::CopyToHost(void * buf, int stream)
 {
 	if(_cuData == NULL) return;
-	cudaMemcpyAsync(buf, _cuData, _imgWidth * _imgHeight * _numChannel * sizeof(float), cudaMemcpyDeviceToHost, (cudaStream_t)stream);
+	hipMemcpyAsync(buf, _cuData, _imgWidth * _imgHeight * _numChannel * sizeof(float), hipMemcpyDeviceToHost, (hipStream_t)stream);
 }
 
 void CuTexImage::CopyFromPBO(int width, int height, GLuint pbo)
 {
-	void* pbuf =NULL;
+	hipGraphicsResource* pbuf =NULL;
 	GLint esize = width * height * sizeof(float);
-	cudaGLRegisterBufferObject(pbo);
-	cudaGLMapBufferObject(&pbuf, pbo);
+  hipGraphicsGLRegisterBuffer(&pbuf, pbo, hipGraphicsRegisterFlagsWriteDiscard);
 
-	cudaMemcpy(_cuData, pbuf, esize, cudaMemcpyDeviceToDevice);
-
-	cudaGLUnmapBufferObject(pbo);
-	cudaGLUnregisterBufferObject(pbo);
+	hipMemcpy(_cuData, pbuf, esize, hipMemcpyDeviceToDevice);
 }
 
 int CuTexImage::CopyToPBO(GLuint pbo)
 {
-	void* pbuf =NULL;
+	hipGraphicsResource* pbuf =NULL;
 	GLint bsize, esize = _imgWidth * _imgHeight * sizeof(float) * _numChannel;
 	glBindBuffer(GL_PIXEL_PACK_BUFFER_ARB, pbo);
 	glGetBufferParameteriv(GL_PIXEL_PACK_BUFFER_ARB, GL_BUFFER_SIZE, &bsize);
@@ -238,11 +233,8 @@ int CuTexImage::CopyToPBO(GLuint pbo)
 
 	if(bsize >= esize)
 	{
-		cudaGLRegisterBufferObject(pbo);
-		cudaGLMapBufferObject(&pbuf, pbo);
-		cudaMemcpy(pbuf, _cuData, esize, cudaMemcpyDeviceToDevice);
-		cudaGLUnmapBufferObject(pbo);
-		cudaGLUnregisterBufferObject(pbo);
+    hipGraphicsGLRegisterBuffer(&pbuf, pbo, hipGraphicsRegisterFlagsWriteDiscard);
+		hipMemcpy(pbuf, _cuData, esize, hipMemcpyDeviceToDevice);
 		return 1;
 	}else
 	{

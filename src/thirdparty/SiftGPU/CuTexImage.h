@@ -24,15 +24,15 @@
 #ifndef CU_TEX_IMAGE_H
 #define CU_TEX_IMAGE_H
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 class GLTexImage;
 
 class CuTexImage
 {
 protected:
-	void*		_cuData;
-	cudaArray*	_cuData2D;
+	hipGraphicsResource* _cuData;
+	hipArray*	_cuData2D;
 	int			_numChannel;
 	size_t			_numBytes;
 	int			_imgWidth;
@@ -43,16 +43,16 @@ protected:
 public:
 	struct CuTexObj
 	{
-		cudaTextureObject_t handle;
+		hipTextureObject_t handle;
 		~CuTexObj();
 	};
 
 	virtual void SetImageSize(int width, int height);
 	virtual bool InitTexture(int width, int height, int nchannel = 1);
-	CuTexObj BindTexture(const cudaTextureDesc& textureDesc,
-											 const cudaChannelFormatDesc& channelFmtDesc);
-	CuTexObj BindTexture2D(const cudaTextureDesc& textureDesc,
-											   const cudaChannelFormatDesc& channelFmtDesc);
+	CuTexObj BindTexture(const hipTextureDesc& textureDesc,
+											 const hipChannelFormatDesc& channelFmtDesc);
+	CuTexObj BindTexture2D(const hipTextureDesc& textureDesc,
+											   const hipChannelFormatDesc& channelFmtDesc);
 	void CopyToHost(void* buf);
 	void CopyToHost(void* buf, int stream);
 	void CopyFromHost(const void* buf);

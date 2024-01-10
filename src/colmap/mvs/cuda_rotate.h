@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 // Copyright (c) 2023, ETH Zurich and UNC Chapel Hill.
 // All rights reserved.
 //
@@ -29,7 +30,7 @@
 
 #pragma once
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 namespace colmap {
 namespace mvs {
@@ -47,7 +48,7 @@ void CudaRotate(const T* input,
 // Implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifdef __CUDACC__
+#ifdef __HIPCC__
 
 #define TILE_DIM_ROTATE 32
 
@@ -94,7 +95,7 @@ void CudaRotate(const T* input,
 
 #undef TILE_DIM_ROTATE
 
-#endif  // __CUDACC__
+#endif  // __HIPCC__
 
 }  // namespace mvs
 }  // namespace colmap

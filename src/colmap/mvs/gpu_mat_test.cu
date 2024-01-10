@@ -27,9 +27,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-#ifdef __CUDACC__
+#ifdef __HIPCC__
 #define BOOST_PP_VARIADICS 0
-#endif  // __CUDACC__
+#endif  // __HIPCC__
 
 #include "colmap/math/math.h"
 #include "colmap/mvs/gpu_mat.h"
