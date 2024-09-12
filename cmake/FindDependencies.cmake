@@ -81,66 +81,66 @@ endif()
 
 set(COLMAP_LINK_DIRS ${Boost_LIBRARY_DIRS})
 
-set(CUDA_MIN_VERSION "7.0")
+set(HIP_MIN_VERSION "7.0")
 if(CUDA_ENABLED)
-    if(CMAKE_VERSION VERSION_LESS 3.17)
-        find_package(CUDA QUIET)
-        if(CUDA_FOUND)
-            message(STATUS "Found CUDA version ${CUDA_VERSION} installed in "
-                    "${CUDA_TOOLKIT_ROOT_DIR} via legacy CMake (<3.17) module. "
+  if(CMAKE_VERSION VERSION_LESS 3.17)
+      find_package(HIP QUIET)
+      if(HIP_FOUND)
+        message(STATUS "Found HIP version ${HIP_VERSION} installed in "
+                    "${HIP_ROOT_DIR} via legacy CMake (<3.17) module. "
                     "Using the legacy CMake module means that any installation of "
-                    "COLMAP will require that the CUDA libraries are "
+                    "COLMAP will require that the HIP libraries are "
                     "available under LD_LIBRARY_PATH.")
-            message(STATUS "Found CUDA ")
-            message(STATUS "  Includes : ${CUDA_INCLUDE_DIRS}")
-            message(STATUS "  Libraries : ${CUDA_LIBRARIES}")
+                  message(STATUS "Found HIP ")
+                  message(STATUS "  Includes : ${HIP_INCLUDE_DIRS}")
+                  message(STATUS "  Libraries : ${HIP_LIBRARIES}")
 
-            enable_language(CUDA)
+                  enable_language(HIP)
 
-            macro(declare_imported_cuda_target module)
-                add_library(CUDA::${module} INTERFACE IMPORTED)
+            macro(declare_imported_hip_target module)
+              add_library(HIP::${module} INTERFACE IMPORTED)
                 target_include_directories(
-                    CUDA::${module} INTERFACE ${CUDA_INCLUDE_DIRS})
+                  HIP::${module} INTERFACE ${HIP_INCLUDE_DIRS})
                 target_link_libraries(
-                    CUDA::${module} INTERFACE ${CUDA_${module}_LIBRARY} ${ARGN})
+                  HIP::${module} INTERFACE ${HIP_${module}_LIBRARY} ${ARGN})
             endmacro()
 
-            declare_imported_cuda_target(cudart ${CUDA_LIBRARIES})
-            declare_imported_cuda_target(curand ${CUDA_LIBRARIES})
+            declare_imported_hip_target(hiprt ${HIP_LIBRARIES})
+            declare_imported_hip_target(rocrand ${HIP_LIBRARIES})
             
-            set(CUDAToolkit_VERSION "${CUDA_VERSION_STRING}")
-            set(CUDAToolkit_BIN_DIR "${CUDA_TOOLKIT_ROOT_DIR}/bin")
+            set(HIPToolkit_VERSION "${HIP_VERSION_STRING}")
+            set(HIPToolkit_BIN_DIR "${HIP_ROOT_DIR}/bin")
         endif()
     else()
-        find_package(CUDAToolkit QUIET)
-        if(CUDAToolkit_FOUND)
-            set(CUDA_FOUND ON)
-            enable_language(CUDA)
+      find_package(HIPToolkit ${COLMAP_FIND_TYPE})
+      if(HIPToolkit_FOUND)
+        set(HIP_FOUND ON)
+        enable_language(HIP)
         endif()
     endif()
 endif()
 
-if(CUDA_ENABLED AND CUDA_FOUND)
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+if(CUDA_ENABLED AND HIP_FOUND)
+  if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
         message(
-            FATAL_ERROR "You must set CMAKE_CUDA_ARCHITECTURES to e.g. 'native', 'all-major', '70', etc. "
-            "More information at https://cmake.org/cmake/help/latest/prop_tgt/CUDA_ARCHITECTURES.html")
+          FATAL_ERROR "You must set CMAKE_HIP_ARCHITECTURES to e.g. 'amd', etc. "
+          "More information at https://cmake.org/cmake/help/latest/prop_tgt/HIP_ARCHITECTURES.html")
     endif()
 
     add_definitions("-DCOLMAP_CUDA_ENABLED")
 
     # Do not show warnings if the architectures are deprecated.
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
-    # Explicitly set PIC flags for CUDA targets.
+    set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Wno-deprecated-gpu-targets")
+    # Explicitly set PIC flags for HIP targets.
     if(NOT IS_MSVC)
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --compiler-options -fPIC")
+      set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} --compiler-options -fPIC")
     endif()
 
-    message(STATUS "Enabling CUDA support (version: ${CUDAToolkit_VERSION}, "
-                    "archs: ${CMAKE_CUDA_ARCHITECTURES})")
+    message(STATUS "Enabling HIP support (version: ${HIP_VERSION}, "
+      "archs: ${CMAKE_HIP_ARCHITECTURES})")
 else()
     set(CUDA_ENABLED OFF)
-    message(STATUS "Disabling CUDA support")
+    message(STATUS "Disabling HIP support")
 endif()
 
 if(GUI_ENABLED)

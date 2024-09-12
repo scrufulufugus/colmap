@@ -73,7 +73,7 @@ if(CUDA_ENABLED)
             cudacc.h cudacc.cc
         PUBLIC_LINK_LIBS
             colmap_util
-            CUDA::cudart
+            HIP::hiprt
     )
 endif()
 
